@@ -14,6 +14,10 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 app.config.from_envvar('FLASKR_SETTINGS', silent=True)
 
+db_source = {'/login': 'user.sql',
+             '/add': 'entry.sql',
+             '/list': 'entry.sql'}
+
 
 def connect_db():
     return sqlite3.connect(app.config['DATABASE'])
@@ -21,7 +25,7 @@ def connect_db():
 
 def init_db():
     with closing(connect_db()) as db:
-        with app.open_resource('schema.sql', mode='r') as f:
+        with app.open_resource('entry.sql', mode='r') as f:
             db.cursor().executescript(f.read())
         db.commit()
 
@@ -60,15 +64,29 @@ def add_entry():
 def login():
     error = None
     if request.method == 'POST':
-        if request.form['username'] != app.config['USERNAME']:
-            error = 'Invalid username'
-        elif request.form['password'] != app.config['PASSWORD']:
-            error = 'Invalid password'
-        else:
+        uid = request.form['username']
+        pwd = request.form['password']
+        sql = "select id from user where username = '%s' and password = '%s'" % (uid, pwd)
+        print "sql: ", sql
+        user = g.db.execute(sql)
+        if user:
             session['logged_in'] = True
             flash('You were logged in')
             return redirect(url_for('show_entries'))
+        else:
+            error = "Invalid username or password"
     return render_template('login.html', error=error)
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    error = None
+    if request.method == 'POST':
+        g.db.execute('insert into user (username, password) values (?, ?)',
+                     [request.form['username'], request.form['password']])
+        g.db.commit()
+        return render_template('login.html', error=error)
+    return render_template('register.html', error=error)
 
 
 @app.route('/logout')
