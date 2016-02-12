@@ -1,6 +1,10 @@
 drop table if exists entries;
-create table entries (
-  id BIGINT  primary KEY AUTO_INCREMENT ,
-  title TEXT  not null,
-  text TEXT  not null
-);
+CREATE TABLE `entries` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `title` text NOT NULL,
+  `text` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=60 DEFAULT CHARSET=utf8mb4
+
+
+alter table `entries` add column uid bigint not null default 0 after id

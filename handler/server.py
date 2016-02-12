@@ -2,8 +2,6 @@
 #coding=utf-8
 
 from flask import Flask, render_template, request, session, g, redirect, url_for, abort, flash
-import sqlite3
-from contextlib import closing
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -16,21 +14,6 @@ PASSWORD = 'admin'
 app = Flask(__name__)
 app.config.from_object(__name__)
 app.config.from_envvar('FLASKR_SETTINGS', silent=True)
-
-db_source = {'/login': 'user.sql',
-             '/add': 'entry.sql',
-             '/list': 'entry.sql'}
-
-
-def connect_db():
-    return sqlite3.connect(app.config['DATABASE'])
-
-
-def init_db():
-    with closing(connect_db()) as db:
-        with app.open_resource('entry.sql', mode='r') as f:
-            db.cursor().executescript(f.read())
-        db.commit()
 
 
 def _create_engine(user, password, host, port, db, autocommit=False, pool_recycle=60):
@@ -58,32 +41,9 @@ db_session = scoped_session(sessionmaker(autocommit=False,
                                          bind=engine))
 
 
-def dump_sqlite_to_mysql():
-    from entry import Entry
-    db = connect_db()
-    cur = db.execute("SELECT title, text from entries order by id desc")
-    entries = [Entry(title=row[0], text=row[1]) for row in cur.fetchall()]
-
-    db_session.add_all(entries)
-    db_session.commit()
-    print entries
-
-
-@app.before_request
-def before_request():
-    g.db = connect_db()
-
-
-@app.teardown_request
-def teardown_request(exception):
-    db = getattr(g, 'db', None)
-    if db is not None:
-        db.close()
-
-
 @app.route('/list')
 def show_entries():
-    from entry import Entry
+    from handler.common.entry import Entry
     rows = db_session.query(Entry).all()
     entries = [dict(title=row.title, text=row.text) for row in rows]
     return render_template('show_entries.html', entries=entries)
@@ -94,7 +54,7 @@ def add_entry():
     if not session.get('logged_in'):
         abort(401)
 
-    from entry import Entry
+    from handler.common.entry import Entry
     entry = Entry(title=request.form['title'], text=request.form['text'])
     db_session.add(entry)
     db_session.commit()
@@ -125,7 +85,7 @@ def login():
 def register():
     error = None
     if request.method == 'POST':
-        from entry import User
+        from handler.common.entry import User
         user = User(username=request.form['username'], password=request.form['password'])
         db_session.add(user)
         db_session.commit()
