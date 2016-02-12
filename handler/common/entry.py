@@ -19,5 +19,6 @@ class Entry(Base):
 
     __tablename__ = 'entries'
     id = Column(BigInteger, primary_key=True)
+    uid = Column(BigInteger)
     title = Column(Text)
     text = Column(Text)

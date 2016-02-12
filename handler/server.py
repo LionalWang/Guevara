@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #coding=utf-8
 
-from flask import Flask, render_template, request, session, g, redirect, url_for, abort, flash
+from flask import Flask, render_template, request, session, redirect, url_for, abort, flash
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -27,7 +27,7 @@ def _create_engine(user, password, host, port, db, autocommit=False, pool_recycl
         connect_args={'connect_timeout': 1, 'autocommit': 1 if autocommit else 0})
     return engine
 
-engine = _create_engine("guevara", "Ding753951ss", "rdsgggx8ppf0310n79lst.mysql.rds.aliyuncs.com", 3306, 'guevara')
+_engine = _create_engine("guevara", "Ding753951ss", "rdsgggx8ppf0310n79lst.mysql.rds.aliyuncs.com", 3306, 'guevara')
 
 
 def _query(engine, sql):
@@ -38,13 +38,14 @@ def _query(engine, sql):
 
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
-                                         bind=engine))
+                                         bind=_engine))
 
 
 @app.route('/list')
 def show_entries():
     from handler.common.entry import Entry
-    rows = db_session.query(Entry).all()
+    uid = session.get('uid', 0)
+    rows = db_session.query(Entry).filter_by(uid=uid).all()
     entries = [dict(title=row.title, text=row.text) for row in rows]
     return render_template('show_entries.html', entries=entries)
 
@@ -55,7 +56,7 @@ def add_entry():
         abort(401)
 
     from handler.common.entry import Entry
-    entry = Entry(title=request.form['title'], text=request.form['text'])
+    entry = Entry(uid=session['uid'], title=request.form['title'], text=request.form['text'])
     db_session.add(entry)
     db_session.commit()
     flash('New entry was successfully posted')
@@ -69,15 +70,17 @@ def login():
         uid = request.form['username']
         pwd = request.form['password']
         sql = "select id from user where username = '%s' and password = '%s'" % (uid, pwd)
-        print "sql: ", sql
-        results = _query(engine, sql)
-        user = results.fetchall()
+        results = _query(_engine, sql)
+        user = results.fetchone()  # tuple return
         if user:
             session['logged_in'] = True
+            session['uid'] = user[0]
+            print "after login: %s" % session
             flash('You were logged in')
             return redirect(url_for('show_entries'))
         else:
             error = "Invalid username or password"
+
     return render_template('login.html', error=error)
 
 
@@ -96,6 +99,7 @@ def register():
 @app.route('/logout')
 def logout():
     session.pop('logged_in', None)
+    session.pop('uid', None)
     flash('You were logged out')
     return redirect(url_for('show_entries'))
 
